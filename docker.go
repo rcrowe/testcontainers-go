@@ -13,6 +13,7 @@ import (
 	"io"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -774,7 +775,7 @@ func NewDockerClient() (cli *client.Client, host string, tcConfig TestContainers
 	} else if dockerHostEnv := os.Getenv("DOCKER_HOST"); dockerHostEnv != "" {
 		host = dockerHostEnv
 	} else {
-		host = "unix:///var/run/docker.sock"
+		host = defaultHost()
 	}
 
 	opts = append(opts, client.WithHTTPHeaders(
@@ -833,6 +834,36 @@ func configureTC() TestContainersConfig {
 	}
 
 	return applyEnvironmentConfiguration(config)
+}
+
+type dockerContext []struct {
+	Name      string `json:"Name"`
+	Endpoints struct {
+		Docker struct {
+			Host string `json:"Host"`
+		} `json:"docker"`
+	} `json:"Endpoints"`
+}
+
+// defaultHost attempts to use docker context to find the best default host
+func defaultHost() string {
+	host := "unix:///var/run/docker.sock"
+
+	cmd := exec.Command("docker", "context", "inspect", "-f", "json")
+	stdout, err := cmd.Output()
+	if err != nil {
+		// assume an old docker version without context support
+		return host
+	}
+
+	var inspect dockerContext
+	if err := json.Unmarshal(stdout, &inspect); err != nil {
+		return host
+	}
+	if len(inspect) == 0 || inspect[0].Endpoints.Docker.Host == "" {
+		return host
+	}
+	return inspect[0].Endpoints.Docker.Host
 }
 
 // BuildImage will build and image from context and Dockerfile, then return the tag
