@@ -11,10 +11,7 @@ type options struct {
 	ImageTag  string
 	StoreSize string
 
-	TLSEnabled bool
-	TLSCA      *x509.Certificate
-	TLSCert    []byte
-	TLSKey     []byte
+	TLS *TLSConfig
 }
 
 func defaultOptions() options {
@@ -51,13 +48,18 @@ func WithStoreSize(size string) Option {
 	}
 }
 
+type TLSConfig struct {
+	CACert     *x509.Certificate
+	NodeCert   []byte
+	NodeKey    []byte
+	ClientCert []byte
+	ClientKey  []byte
+}
+
 // WithTLS enables TLS on the CockroachDB container.
 // Cert and key must be a valid PEM-encoded certificate and key.
-func WithTLS(ca *x509.Certificate, cert, key []byte) Option {
+func WithTLS(cfg TLSConfig) Option {
 	return func(o *options) {
-		o.TLSEnabled = true
-		o.TLSCA = ca
-		o.TLSCert = cert
-		o.TLSKey = key
+		o.TLS = &cfg
 	}
 }
